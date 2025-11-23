@@ -1,8 +1,6 @@
-aiogram==3.4.1
-fastapi
-uvicorn
-google-api-python-client
-google-auth
-google-auth-httplib2
-google-auth-oauthlib
-python-multipart
+aiogram==3.1.0
+aiohttp==3.8.5
+google-api-python-client==2.95.0
+google-auth==2.21.0
+google-auth-httplib2==0.1.0
+google-auth-oauthlib==1.0.0
