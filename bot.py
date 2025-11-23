@@ -10,7 +10,7 @@ from aiogram.types import FSInputFile
 from aiogram.utils.executor import start_webhook
 
 # ---------------- CONFIG ----------------
-BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Set this in Cloud Run secrets
+BOT_TOKEN = os.environ.get("8539647721:AAEmfwcf8TCboMPK7gT1SQ-zO0VgZdlBHUE")  # Set this in Cloud Run secrets
 SERVICE_ACCOUNT_FILE = "credentials.json"  # Add your service account JSON
 MAIN_FOLDER_ID = "1JmQDiKZj3QYsivTHoZwJ7mFOAFCXfwAz"
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
