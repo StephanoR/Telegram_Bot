@@ -11,9 +11,9 @@ from aiohttp import web
 from aiogram.types import FSInputFile
 
 # ---------------- CONFIG ----------------
-BOT_TOKEN = os.getenv("8539647721:AAEmfwcf8TCboMPK7gT1SQ-zO0VgZdlBHUE")  # Set this in Cloud Run environment variables
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+MAIN_FOLDER_ID = os.getenv("MAIN_FOLDER_ID")  
 SERVICE_ACCOUNT_FILE = "credentials.json"  # Keep this file in your repo
-MAIN_FOLDER_ID = os.getenv("1JmQDiKZj3QYsivTHoZwJ7mFOAFCXfwAz")  # e.g., your Google Drive folder ID
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 # ---------------- GOOGLE DRIVE API ----------------
