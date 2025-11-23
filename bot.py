@@ -6,13 +6,7 @@ from aiogram.filters import Command
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-from aiogram import types
 from aiogram.types import FSInputFile
-
-
-keyboard = types.InlineKeyboardMarkup(
-    inline_keyboard=[]  # start with an empty list
-)
 
 # ---------------- CONFIG ----------------
 BOT_TOKEN = "8539647721:AAEmfwcf8TCboMPK7gT1SQ-zO0VgZdlBHUE"  # Replace with your BotFather token
@@ -53,7 +47,6 @@ dp = Dispatcher()
 async def start_cmd(message: types.Message):
     items = list_folder(MAIN_FOLDER_ID)
     
-    # Create keyboard with empty list
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[])
     
     for item in items:
@@ -64,8 +57,6 @@ async def start_cmd(message: types.Message):
     
     await message.answer("Select a folder or file:", reply_markup=keyboard)
 
-from aiogram.types import FSInputFile
-
 @dp.callback_query()
 async def handle_callbacks(callback: types.CallbackQuery):
     kind, file_id, name = callback.data.split(':', 2)
@@ -74,6 +65,7 @@ async def handle_callbacks(callback: types.CallbackQuery):
         items = list_folder(file_id)
         if not items:
             await callback.message.edit_text(f"{name} is empty.")
+            await callback.answer()
             return
         
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=[])
@@ -85,19 +77,19 @@ async def handle_callbacks(callback: types.CallbackQuery):
         await callback.message.edit_text(f"Contents of {name}:", reply_markup=keyboard)
     
     else:
-        # Get file metadata to check size and get link
+        # Get file metadata to check size
         file_meta = service.files().get(fileId=file_id, fields="size,webViewLink").execute()
         file_size = int(file_meta.get("size", 0))  # size in bytes
         file_link = file_meta.get("webViewLink")   # Google Drive link
         
-        # If file ≤50MB (Telegram limit)
-        if file_size <= 50 * 1024 * 1024:
+        if file_size <= 50 * 1024 * 1024:  # Telegram limit
             temp_file = download_file(file_id, name)
             await callback.message.answer_document(FSInputFile(temp_file))
             os.remove(temp_file)
         else:
-            # File too large → send Google Drive link
             await callback.message.answer(f"File is too large to send via Telegram.\nDownload it here:\n{file_link}")
+    
+    await callback.answer()
 
 # ---------------- RUN BOT ----------------
 async def main():
