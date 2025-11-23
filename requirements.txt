@@ -1,3 +1,6 @@
-aiogram==3.0.0b7
+aiogram==3.4.1
+aiohttp
 google-api-python-client
 google-auth
+google-auth-oauthlib
+google-auth-httplib2
