@@ -1,6 +1,6 @@
 # ------------------ Dockerfile ------------------
-# Use Python 3.13 slim image
-FROM python:3.13-slim
+FROM python:3.11-slim
+
 
 # Set environment variables for Python
 ENV PYTHONUNBUFFERED=1
@@ -25,3 +25,4 @@ EXPOSE 8080
 
 # Command to run the bot
 CMD ["python", "bot.py"]
+
