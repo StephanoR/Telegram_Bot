@@ -1,4 +1,6 @@
-aiogram
-google-api-python-client
 google-auth
 google-auth-httplib2
+aiogram==3.1.0
+gdown==4.6.6
+google-api-python-client==2.90.0
+
