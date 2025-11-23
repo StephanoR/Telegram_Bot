@@ -1,18 +1,10 @@
-# Base Python image
-FROM python:3.11-slim
+FROM python:3.13-slim
 
-# Set working directory
 WORKDIR /app
 
-# Copy all files
-COPY . /app
-
-# Install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Set environment variable placeholders
-ENV BOT_TOKEN=""
-ENV GOOGLE_CREDENTIALS_JSON=""
+COPY . .
 
-# Start bot
 CMD ["python", "bot.py"]
