@@ -2,6 +2,4 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-credentials.json
 .env
-.git
