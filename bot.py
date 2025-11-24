@@ -1,128 +1,146 @@
 import os
 import io
 import asyncio
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-from aiohttp import web
 
-# ---------------- CONFIG ----------------
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Cloud Run env var
-MAIN_FOLDER_ID = os.getenv("MAIN_FOLDER_ID")  # Cloud Run env var
-SERVICE_ACCOUNT_FILE = "credentials.json"
+# ---------------- ENV VARIABLES ----------------
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+MAIN_FOLDER_ID = os.getenv("MAIN_FOLDER_ID")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Cloud Run URL + /webhook
 
 if not BOT_TOKEN:
-    raise Exception("❌ BOT_TOKEN environment variable is missing!")
+    raise Exception("❌ Missing BOT_TOKEN environment variable!")
 
 if not MAIN_FOLDER_ID:
-    raise Exception("❌ MAIN_FOLDER_ID environment variable is missing!")
+    raise Exception("❌ Missing MAIN_FOLDER_ID!")
 
-SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+if not WEBHOOK_URL:
+    raise Exception("❌ Missing WEBHOOK_URL!")
 
-# ---------------- GOOGLE DRIVE API ----------------
+# ---------------- GOOGLE DRIVE ----------------
+SERVICE_ACCOUNT_FILE = "credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+
 credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES
+)
+drive = build("drive", "v3", credentials=credentials)
 
-service = build('drive', 'v3', credentials=credentials)
+# ---------------- BOT SETUP ----------------
+bot = Bot(BOT_TOKEN)
+dp = Dispatcher()
 
 
 def list_folder(folder_id):
     query = f"'{folder_id}' in parents and trashed=false"
-    results = service.files().list(
+    results = drive.files().list(
         q=query,
-        fields="files(id, name, mimeType)"
+        fields="files(id,name,mimeType)"
     ).execute()
-    return results.get('files', [])
+    return results.get("files", [])
 
 
 def download_file(file_id, file_name):
-    request = service.files().get_media(fileId=file_id)
-    fh = io.FileIO(file_name, 'wb')
-    downloader = MediaIoBaseDownload(fh, request)
+    request = drive.files().get_media(fileId=file_id)
+    f = io.FileIO(file_name, 'wb')
+    downloader = MediaIoBaseDownload(f, request)
     done = False
     while not done:
         status, done = downloader.next_chunk()
     return file_name
 
 
-# ---------------- TELEGRAM BOT ----------------
-bot = Bot(BOT_TOKEN)
-dp = Dispatcher()
-
-
+# ---------------- BOT HANDLERS ----------------
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     items = list_folder(MAIN_FOLDER_ID)
-
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
 
     for item in items:
-        cb_data = f"{'folder' if item['mimeType'].endswith('folder') else 'file'}:{item['id']}:{item['name']}"
-        keyboard.inline_keyboard.append(
-            [InlineKeyboardButton(text=item['name'], callback_data=cb_data)]
-        )
+        kind = "folder" if item["mimeType"].endswith("folder") else "file"
+        keyboard.inline_keyboard.append([
+            InlineKeyboardButton(
+                text=item["name"],
+                callback_data=f"{kind}:{item['id']}:{item['name']}"
+            )
+        ])
 
     await message.answer("📁 Select a folder or file:", reply_markup=keyboard)
 
 
 @dp.callback_query()
-async def handle_callbacks(callback: types.CallbackQuery):
-    kind, file_id, name = callback.data.split(':', 2)
+async def callback_handler(call: types.CallbackQuery):
+    kind, file_id, name = call.data.split(":", 2)
 
     if kind == "folder":
         items = list_folder(file_id)
 
         if not items:
-            await callback.message.edit_text(f"{name} is empty.")
+            await call.message.edit_text(f"{name} is empty.")
             return
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-
         for item in items:
-            cb_data = f"{'folder' if item['mimeType'].endswith('folder') else 'file'}:{item['id']}:{item['name']}"
-            keyboard.inline_keyboard.append(
-                [InlineKeyboardButton(text=item['name'], callback_data=cb_data)]
-            )
+            kind2 = "folder" if item["mimeType"].endswith("folder") else "file"
+            keyboard.inline_keyboard.append([
+                InlineKeyboardButton(
+                    text=item["name"],
+                    callback_data=f"{kind2}:{item['id']}:{item['name']}"
+                )
+            ])
 
-        await callback.message.edit_text(f"📁 Contents of {name}:", reply_markup=keyboard)
+        await call.message.edit_text(f"📁 Contents of {name}:", reply_markup=keyboard)
 
     else:
-        # file
-        file_meta = service.files().get(fileId=file_id, fields="size,webViewLink").execute()
-        size = int(file_meta.get("size", 0))
-        link = file_meta.get("webViewLink")
+        meta = drive.files().get(fileId=file_id, fields="size, webViewLink").execute()
+        size = int(meta.get("size", 0))
+        link = meta.get("webViewLink")
 
         if size <= 50 * 1024 * 1024:
-            temp = download_file(file_id, name)
-            await callback.message.answer_document(FSInputFile(temp))
-            os.remove(temp)
+            path = download_file(file_id, name)
+            await call.message.answer_document(FSInputFile(path))
+            os.remove(path)
         else:
-            await callback.message.answer(f"⚠️ File too large for Telegram.\nDownload:\n{link}")
+            await call.message.answer(f"⚠️ Too large.\nDownload:\n{link}")
 
 
-# ---------------- HTTP SERVER FOR CLOUD RUN ----------------
-async def handle(request):
+# ---------------- WEBHOOK SERVER (Cloud Run) ----------------
+async def handle_webhook(request):
+    update = await request.json()
+    await dp.feed_raw_update(bot, update)
+    return web.Response(text="ok")
+
+
+async def health(request):
     return web.Response(text="Bot OK")
 
-async def start_server():
+
+async def main():
+    # ---- Set webhook ----
+    await bot.delete_webhook()
+    await bot.set_webhook(WEBHOOK_URL)
+    print(f"Webhook set: {WEBHOOK_URL}")
+
+    # ---- Start webhook server ----
     app = web.Application()
-    app.router.add_get("/", handle)
+    app.router.add_post("/webhook", handle_webhook)
+    app.router.add_get("/", health)
+
+    port = int(os.getenv("PORT", 8080))
     runner = web.AppRunner(app)
     await runner.setup()
-    port = int(os.getenv("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    print(f"HTTP health server running on port {port}")
+    print(f"Webhook server running on port {port}")
 
-
-# ---------------- MAIN ----------------
-async def main():
-    await start_server()
-    print("Starting Telegram bot polling...")
-    await dp.start_polling(bot)
+    # Keep alive
+    await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
