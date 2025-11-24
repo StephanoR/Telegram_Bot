@@ -122,22 +122,21 @@ async def health(request):
 
 
 async def main():
-    # ---- Set webhook ----
-    await bot.delete_webhook()
-    await bot.set_webhook(WEBHOOK_URL)
-    print(f"Webhook set: {WEBHOOK_URL}")
-
-    # ---- Start webhook server ----
+    port = int(os.getenv("PORT", 8080))
     app = web.Application()
     app.router.add_post("/webhook", handle_webhook)
     app.router.add_get("/", health)
 
-    port = int(os.getenv("PORT", 8080))
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    print(f"Webhook server running on port {port}")
+    print(f"Server running on port {port}")
+
+    # Now set the webhook AFTER the server is up
+    await bot.delete_webhook()
+    await bot.set_webhook(WEBHOOK_URL)
+    print(f"Webhook set: {WEBHOOK_URL}")
 
     # Keep alive
     await asyncio.Event().wait()
