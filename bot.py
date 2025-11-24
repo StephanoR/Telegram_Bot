@@ -124,8 +124,9 @@ async def handle_webhook(request):
         await dp.feed_raw_update(bot, update)
         return web.Response(text="ok")
     except Exception as e:
-        logger.exception("Error handling webhook")
-        return web.Response(status=500, text="Internal Server Error")
+        print(f"❌ Webhook error: {e}")
+        return web.Response(text="error", status=500)
+
 
 async def health(request):
     return web.Response(text="Bot OK")
@@ -151,6 +152,11 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     logger.info(f"Webhook server running on port {port}")
+
+    print(f"BOT_TOKEN: {BOT_TOKEN[:5]}...")  # mask token
+    print(f"MAIN_FOLDER_ID: {MAIN_FOLDER_ID}")
+    print(f"WEBHOOK_URL: {WEBHOOK_URL}")
+    print(f"Credentials exists: {os.path.exists(SERVICE_ACCOUNT_FILE)}")
 
     # Keep alive
     await asyncio.Event().wait()
